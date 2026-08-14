@@ -1,5 +1,5 @@
 name: sequence
-description: "A new Flutter project."
+description: "Sequence — the online multiplayer board game. Create a room, share the code, and race to five in a row."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
