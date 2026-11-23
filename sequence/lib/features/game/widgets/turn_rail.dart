@@ -17,14 +17,24 @@ class TurnSeat {
 }
 
 /// A horizontal strip showing the full turn rotation in order, with the player
-/// whose turn it is highlighted. Scrolls when there are many players, and keeps
+/// whose turn it is highlighted. Names are shown in full — each seat is as
+/// wide as its name — and the strip scrolls when they don't all fit, keeping
 /// the active player in view.
 class TurnRail extends StatefulWidget {
   final List<TurnSeat> seats;
 
   /// Drop the "TURN ORDER" label and tighten padding, for short screens.
   final bool compact;
-  const TurnRail({super.key, required this.seats, this.compact = false});
+
+  /// Lay the seats out in wrapping lines instead of one scrolling strip, so
+  /// every full name is visible at once (the wide layout's sidebar).
+  final bool wrap;
+  const TurnRail({
+    super.key,
+    required this.seats,
+    this.compact = false,
+    this.wrap = false,
+  });
 
   @override
   State<TurnRail> createState() => _TurnRailState();
@@ -32,7 +42,15 @@ class TurnRail extends StatefulWidget {
 
 class _TurnRailState extends State<TurnRail> {
   final _scroll = ScrollController();
-  static const _itemExtent = 60.0; // token width + separators
+  // Seats vary in width with their names, so centre the active one by its
+  // actual position rather than by an assumed fixed width.
+  final _activeKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _centerActive(animate: false);
+  }
 
   @override
   void didUpdateWidget(TurnRail oldWidget) {
@@ -40,17 +58,14 @@ class _TurnRailState extends State<TurnRail> {
     _centerActive();
   }
 
-  void _centerActive() {
-    final i = widget.seats.indexWhere((s) => s.isCurrent);
-    if (i < 0 || !_scroll.hasClients) return;
-    final target = (i * _itemExtent) -
-        (_scroll.position.viewportDimension / 2) +
-        (_itemExtent / 2);
+  void _centerActive({bool animate = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scroll.hasClients) return;
-      _scroll.animateTo(
-        target.clamp(0.0, _scroll.position.maxScrollExtent),
-        duration: const Duration(milliseconds: 300),
+      final active = _activeKey.currentContext;
+      if (active == null || !active.mounted) return;
+      Scrollable.ensureVisible(
+        active,
+        alignment: 0.5,
+        duration: animate ? const Duration(milliseconds: 300) : Duration.zero,
         curve: kEaseSoft,
       );
     });
@@ -80,6 +95,22 @@ class _TurnRailState extends State<TurnRail> {
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
               child: Text('TURN ORDER', style: eyebrow()),
             ),
+          if (widget.wrap)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Wrap(
+                spacing: 2,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  for (var i = 0; i < widget.seats.length; i++) ...[
+                    _SeatToken(seat: widget.seats[i]),
+                    if (i < widget.seats.length - 1) _chevron,
+                  ],
+                ],
+              ),
+            )
+          else
           SizedBox(
             height: 62,
             child: ListView.separated(
@@ -87,11 +118,11 @@ class _TurnRailState extends State<TurnRail> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               itemCount: widget.seats.length,
-              separatorBuilder: (_, _) => const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 16,
-                  color: kLine),
-              itemBuilder: (context, i) => _SeatToken(seat: widget.seats[i]),
+              separatorBuilder: (_, _) => _chevron,
+              itemBuilder: (context, i) => _SeatToken(
+                key: widget.seats[i].isCurrent ? _activeKey : null,
+                seat: widget.seats[i],
+              ),
             ),
           ),
         ],
@@ -100,20 +131,19 @@ class _TurnRailState extends State<TurnRail> {
   }
 }
 
+const _chevron = Icon(Icons.chevron_right_rounded, size: 16, color: kLine);
+
 class _SeatToken extends StatelessWidget {
   final TurnSeat seat;
-  const _SeatToken({required this.seat});
+  const _SeatToken({super.key, required this.seat});
 
   @override
   Widget build(BuildContext context) {
     final c = teamColor(seat.team);
-    final name = seat.name.length > 7
-        ? '${seat.name.substring(0, 6)}…'
-        : seat.name;
     return Opacity(
       opacity: seat.isOnline ? 1 : 0.45,
-      child: SizedBox(
-        width: 44,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 44),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -142,9 +172,9 @@ class _SeatToken extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              name,
+              seat.name, // in full (nicknames are at most 16 characters)
               maxLines: 1,
-              overflow: TextOverflow.clip,
+              softWrap: false,
               style: archivo(
                 weight: seat.isCurrent ? FontWeight.w800 : FontWeight.w600,
                 color: seat.isCurrent ? kInk : kMuted,

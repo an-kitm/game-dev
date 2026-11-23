@@ -7,12 +7,14 @@ import '../../core/supabase.dart';
 import '../../core/theme.dart';
 import '../../data/game_repository.dart';
 import '../../data/lobby_repository.dart';
+import '../../models/move.dart';
 import '../../models/player.dart';
 import '../../models/room.dart';
 import '../../rules/board.dart';
 import '../../rules/legal_moves.dart';
 import 'widgets/board_view.dart';
 import 'widgets/hand_bar.dart';
+import 'widgets/move_history.dart';
 import 'widgets/turn_rail.dart';
 
 class GameScreen extends ConsumerStatefulWidget {
@@ -114,12 +116,46 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     if (swap == true) await _exchangeDead(card);
   }
 
+  /// The move log as a bottom sheet (the portrait layout has no room for it
+  /// inline). It stays live while open; the browser's Back closes it.
+  void _showHistory() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        builder: (context, scroll) => Consumer(
+          builder: (context, ref, _) => ListView(
+            controller: scroll,
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            children: [
+              Text('MOVES', style: eyebrow()),
+              const SizedBox(height: 6),
+              MoveHistory(
+                moves: ref.watch(movesProvider(widget.roomId)).value ??
+                    const <Move>[],
+                players:
+                    ref.watch(playersStreamProvider(widget.roomId)).value ??
+                        const <Player>[],
+                myUserId: currentUserId,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final roomAsync = ref.watch(roomStreamProvider(widget.roomId));
     final playersAsync = ref.watch(playersStreamProvider(widget.roomId));
     final handAsync = ref.watch(handStreamProvider(widget.roomId));
-    final lastMove = ref.watch(lastMoveProvider(widget.roomId)).value;
+    final moves = ref.watch(movesProvider(widget.roomId)).value ?? const <Move>[];
 
     // A rematch resets the room to the lobby; send everyone back there — in
     // place, so Back from the lobby can't return to the finished match.
@@ -203,22 +239,26 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       });
     }
 
-    Widget statusBar({required bool showCode}) => _StatusBar(
+    Widget statusBar({required bool showCode, VoidCallback? onHistory}) =>
+        _StatusBar(
           room: room,
           players: players,
           isMyTurn: isMyTurn,
           accentTeam: accentTeam,
           showCode: showCode,
+          onHistory: onHistory,
         );
-    Widget? turnRail({required bool compact}) =>
+    Widget moveHistory() =>
+        MoveHistory(moves: moves, players: players, myUserId: currentUserId);
+    Widget? turnRail({required bool compact, bool wrap = false}) =>
         (room.isPlaying && seats.length > 1)
-            ? TurnRail(seats: seats, compact: compact)
+            ? TurnRail(seats: seats, compact: compact, wrap: wrap)
             : null;
     Widget boardView({required bool zoomable}) => BoardView(
           board: room.board,
           locked: locked,
           highlighted: legal,
-          lastMove: lastMove,
+          lastMove: lastBoardMove(moves)?.cell,
           accent: accent,
           winningTeam: room.isFinished ? room.winnerTeam : null,
           zoomable: zoomable,
@@ -254,7 +294,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     // dropped entirely on very short screens — the height goes to the board.
     Widget compactBody(BoxConstraints constraints) => Column(
           children: [
-            statusBar(showCode: true),
+            // No room for the move log here: it opens as a sheet instead.
+            statusBar(showCode: true, onHistory: _showHistory),
             if (constraints.maxHeight >= 620) ?turnRail(compact: true),
             Expanded(
               child: Padding(
@@ -294,7 +335,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   statusBar(showCode: showCode),
-                  ?turnRail(compact: false),
+                  ?turnRail(compact: false, wrap: true),
                   if (room.isFinished)
                     _WinnerBanner(room: room)
                   else ...[
@@ -305,6 +346,14 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                     handBar(wrap: true),
                     ?exchange,
                   ],
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 4),
+                    child: Text('MOVES', style: eyebrow()),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: moveHistory(),
+                  ),
                 ],
               ),
             ),
@@ -356,12 +405,16 @@ class _StatusBar extends StatelessWidget {
 
   /// Show the room code beside the win target (when there is no app bar).
   final bool showCode;
+
+  /// Shows a button that opens the move log, when set.
+  final VoidCallback? onHistory;
   const _StatusBar({
     required this.room,
     required this.players,
     required this.isMyTurn,
     required this.accentTeam,
     this.showCode = false,
+    this.onHistory,
   });
 
   @override
@@ -383,7 +436,9 @@ class _StatusBar extends StatelessWidget {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      // The 32px history button sets the height when present.
+      padding: EdgeInsets.fromLTRB(16, onHistory == null ? 12 : 6,
+          onHistory == null ? 16 : 8, onHistory == null ? 12 : 6),
       decoration: BoxDecoration(
         color: teamSoft(accentTeam),
         borderRadius: BorderRadius.circular(kRadiusControl),
@@ -396,10 +451,26 @@ class _StatusBar extends StatelessWidget {
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 10),
-          Text(label, style: archivo(weight: FontWeight.w800, color: kInk, size: 16)),
-          const Spacer(),
+          // Names are shown in full, wrapping onto a second line if needed.
+          Expanded(
+            child: Text(label,
+                style: archivo(weight: FontWeight.w800, color: kInk, size: 16)),
+          ),
+          const SizedBox(width: 10),
           Text(showCode ? '${room.code} · $toWin TO WIN' : '$toWin TO WIN',
               style: eyebrow(color: kMuted)),
+          if (onHistory != null) ...[
+            const SizedBox(width: 4),
+            IconButton(
+              onPressed: onHistory,
+              icon: const Icon(Icons.history_rounded, size: 20),
+              tooltip: 'Moves played',
+              color: kStrong,
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+            ),
+          ],
         ],
       ),
     );

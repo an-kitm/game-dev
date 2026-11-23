@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/supabase.dart';
-import '../rules/board.dart';
+import '../models/move.dart';
 
 /// Move RPCs + the player's own private hand stream. RLS guarantees the hand
 /// stream only ever carries the current user's cards.
@@ -55,21 +55,15 @@ class GameRepository {
     await _client.rpc('heartbeat', params: {'p_room': roomId});
   }
 
-  /// The cell of the most recent place/remove move (for the last-move marker).
-  Stream<Cell?> lastMoveStream(String roomId) => _client
+  /// The room's move log, oldest first. Moves are only ever inserted during a
+  /// game (a rematch deletes them, but the screens showing them have been
+  /// left by then), so the filtered `.stream()` is enough here.
+  Stream<List<Move>> movesStream(String roomId) => _client
       .from('moves')
       .stream(primaryKey: ['id'])
       .eq('room_id', roomId)
-      .order('seq')
-      .map((rows) {
-        for (final m in rows.reversed) {
-          final p = m['payload'] as Map?;
-          if (p != null && p['row'] != null && p['col'] != null) {
-            return Cell(p['row'] as int, p['col'] as int);
-          }
-        }
-        return null;
-      });
+      .map((rows) =>
+          rows.map(Move.fromMap).toList()..sort((a, b) => a.seq.compareTo(b.seq)));
 }
 
 final gameRepositoryProvider =
@@ -83,7 +77,7 @@ final handStreamProvider =
   return ref.watch(gameRepositoryProvider).handStream(roomId);
 });
 
-final lastMoveProvider =
-    StreamProvider.autoDispose.family<Cell?, String>((ref, roomId) {
-  return ref.watch(gameRepositoryProvider).lastMoveStream(roomId);
+final movesProvider =
+    StreamProvider.autoDispose.family<List<Move>, String>((ref, roomId) {
+  return ref.watch(gameRepositoryProvider).movesStream(roomId);
 });
