@@ -75,11 +75,15 @@ class GameRepository {
 final gameRepositoryProvider =
     Provider<GameRepository>((ref) => GameRepository(supabase));
 
+// Auto-disposed like the room streams: a rematch deletes the old hands and
+// moves, which a filtered realtime stream never hears about, so the next game
+// must start from a fresh snapshot rather than a cached one.
 final handStreamProvider =
-    StreamProvider.family<List<String>, String>((ref, roomId) {
+    StreamProvider.autoDispose.family<List<String>, String>((ref, roomId) {
   return ref.watch(gameRepositoryProvider).handStream(roomId);
 });
 
-final lastMoveProvider = StreamProvider.family<Cell?, String>((ref, roomId) {
+final lastMoveProvider =
+    StreamProvider.autoDispose.family<Cell?, String>((ref, roomId) {
   return ref.watch(gameRepositoryProvider).lastMoveStream(roomId);
 });
