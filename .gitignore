@@ -7,9 +7,6 @@
 # Build output / generated (also covered by sequence/.gitignore)
 build/
 .dart_tool/
-*.apk
-*.aab
-*.ipa
 
 # IDE
 .idea/

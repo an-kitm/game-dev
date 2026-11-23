@@ -18,7 +18,6 @@ const Color kPanelMuted = Color(0xFFF6F7F9);
 const Color kSurface = Color(0xFFFFFFFF);
 const Color kCanvasTop = Color(0xFFF4F6FA);
 const Color kCanvasBottom = Color(0xFFE7EBF2);
-const Color kGold = Color(0xFFF3B13B); // accent
 
 // Card ink + the slate of a board cell border / free corner.
 const Color kCardRed = Color(0xFFD8453B); // ♥ ♦
@@ -65,9 +64,6 @@ const double kRadiusPanel = 16;
 const double kRadiusControl = 14;
 
 // ── Elevation ───────────────────────────────────────────────────────────────
-const List<BoxShadow> kControlShadow = [
-  BoxShadow(color: Color(0x0F141823), blurRadius: 18, offset: Offset(0, 6)),
-];
 const List<BoxShadow> kPanelShadow = [
   BoxShadow(color: Color(0x0F141823), blurRadius: 40, offset: Offset(0, 16)),
 ];

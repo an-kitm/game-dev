@@ -1,5 +1,5 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -11,12 +11,6 @@ import 'features/auth/nickname_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Portrait-only: never rotate to landscape, even if the device is turned.
-  await SystemChrome.setPreferredOrientations(const [
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
 
   await Supabase.initialize(
     url: Env.supabaseUrl,
@@ -57,7 +51,22 @@ class SequenceApp extends ConsumerWidget {
       title: 'Sequence',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
+      scrollBehavior: const _AppScrollBehavior(),
       routerConfig: router,
     );
   }
+}
+
+/// Flutter only drag-scrolls with touch by default. On desktop browsers the
+/// hand and turn-order strips scroll sideways, so let a mouse drag them too.
+class _AppScrollBehavior extends MaterialScrollBehavior {
+  const _AppScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => const {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      };
 }

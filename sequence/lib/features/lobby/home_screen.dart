@@ -25,7 +25,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_friendlyError(e))),
+          SnackBar(content: Text(friendlyLobbyError(e))),
         );
       }
     } finally {
@@ -131,7 +131,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-String _friendlyError(Object e) {
+/// Turns a create/join RPC failure into a sentence a player can act on.
+String friendlyLobbyError(Object e) {
   final s = e.toString();
   if (s.contains('not authenticated')) {
     return 'Not signed in yet — enable anonymous sign-ins in Supabase.';

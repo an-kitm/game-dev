@@ -38,7 +38,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     return null;
   }
 
-  Future<void> _onCellTap(Room room, int team, Set<Cell> legal, int r, int c) async {
+  Future<void> _onCellTap(Set<Cell> legal, int r, int c) async {
     if (_busy) return;
     if (_selected == null) {
       _toast('Select a card first');
@@ -183,59 +183,135 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       });
     }
 
-    return HeartbeatTicker(
-      roomId: widget.roomId,
-      child: Scaffold(
-      appBar: AppBar(title: Text('Sequence • ${room.code}')),
-      body: Column(
-        children: [
-          _StatusBar(
-            room: room,
-            players: players,
-            isMyTurn: isMyTurn,
-            accentTeam: accentTeam,
-          ),
-          if (room.isPlaying && seats.length > 1) TurnRail(seats: seats),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: BoardView(
-                board: room.board,
-                locked: locked,
-                highlighted: legal,
-                lastMove: lastMove,
-                accent: accent,
-                winningTeam: room.isFinished ? room.winnerTeam : null,
-                onCellTap: room.isPlaying
-                    ? (r, c) => _onCellTap(room, myTeam, legal, r, c)
-                    : null,
-              ),
-            ),
-          ),
-          if (room.isFinished)
-            _WinnerBanner(room: room)
-          else ...[
-            if (_selected != null && isDeadCard(_selected!, room.board) && isMyTurn)
-              Padding(
+    Widget statusBar({required bool showCode}) => _StatusBar(
+          room: room,
+          players: players,
+          isMyTurn: isMyTurn,
+          accentTeam: accentTeam,
+          showCode: showCode,
+        );
+    Widget? turnRail({required bool compact}) =>
+        (room.isPlaying && seats.length > 1)
+            ? TurnRail(seats: seats, compact: compact)
+            : null;
+    Widget boardView({required bool zoomable}) => BoardView(
+          board: room.board,
+          locked: locked,
+          highlighted: legal,
+          lastMove: lastMove,
+          accent: accent,
+          winningTeam: room.isFinished ? room.winnerTeam : null,
+          zoomable: zoomable,
+          onCellTap: room.isPlaying
+              ? (r, c) => _onCellTap(legal, r, c)
+              : null,
+        );
+    final exchange =
+        (_selected != null && isDeadCard(_selected!, room.board) && isMyTurn)
+            ? Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: TextButton.icon(
                   onPressed: _busy ? null : () => _exchangeDead(_selected!),
                   icon: const Icon(Icons.autorenew),
                   label: Text('Exchange dead card $_selected'),
                 ),
+              )
+            : null;
+    Widget handBar({required bool wrap}) => HandBar(
+          cards: hand,
+          selected: _selected,
+          deadCards: deadCards,
+          enabled: isMyTurn && !_busy,
+          accent: teamColor(myTeam),
+          wrap: wrap,
+          onCardTap: (card) =>
+              setState(() => _selected = _selected == card ? null : card),
+        );
+
+    // Portrait: everything stacked around the board. Phones in a browser lose
+    // ~100px to the address and tool bars, so this layout has no app bar (the
+    // room code sits in the status bar) and a slimmer turn rail that is
+    // dropped entirely on very short screens — the height goes to the board.
+    Widget compactBody(BoxConstraints constraints) => Column(
+          children: [
+            statusBar(showCode: true),
+            if (constraints.maxHeight >= 620) ?turnRail(compact: true),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: boardView(zoomable: true),
               ),
-            HandBar(
-              cards: hand,
-              selected: _selected,
-              deadCards: deadCards,
-              enabled: isMyTurn && !_busy,
-              accent: teamColor(myTeam),
-              onCardTap: (card) =>
-                  setState(() => _selected = _selected == card ? null : card),
             ),
+            if (room.isFinished)
+              _WinnerBanner(room: room)
+            else ...[
+              ?exchange,
+              handBar(wrap: false),
+            ],
           ],
+        );
+
+    // Landscape (desktop browsers, tablets, phones turned sideways): the
+    // board fills the left, with status, turn order and hand in a sidebar.
+    Widget wideBody(BoxConstraints constraints, {required bool showCode}) {
+      final sidebarWidth = (constraints.maxWidth * 0.36).clamp(300.0, 400.0);
+      return Row(
+        // Stretch so the sidebar starts at the top and scrolls over the full
+        // height, rather than shrinking to its content and centering.
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: boardView(zoomable: false),
+            ),
+          ),
+          SizedBox(
+            width: sidebarWidth,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(0, 4, 8, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  statusBar(showCode: showCode),
+                  ?turnRail(compact: false),
+                  if (room.isFinished)
+                    _WinnerBanner(room: room)
+                  else ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                      child: Text('YOUR HAND', style: eyebrow()),
+                    ),
+                    handBar(wrap: true),
+                    ?exchange,
+                  ],
+                ],
+              ),
+            ),
+          ),
         ],
-      ),
+      );
+    }
+
+    return HeartbeatTicker(
+      roomId: widget.roomId,
+      child: LayoutBuilder(
+        builder: (context, screen) {
+          final wide = screen.maxWidth > screen.maxHeight * 1.1;
+          // Only spend height on an app bar when there is height to spare.
+          final appBar = wide && screen.maxHeight >= 560;
+          return Scaffold(
+            appBar:
+                appBar ? AppBar(title: Text('Sequence • ${room.code}')) : null,
+            body: SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) => wide
+                    ? wideBody(constraints, showCode: !appBar)
+                    : compactBody(constraints),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -257,11 +333,15 @@ class _StatusBar extends StatelessWidget {
   final List<Player> players;
   final bool isMyTurn;
   final int accentTeam;
+
+  /// Show the room code beside the win target (when there is no app bar).
+  final bool showCode;
   const _StatusBar({
     required this.room,
     required this.players,
     required this.isMyTurn,
     required this.accentTeam,
+    this.showCode = false,
   });
 
   @override
@@ -279,7 +359,7 @@ class _StatusBar extends StatelessWidget {
       }
       label = cur != null ? "${cur.nickname}'s turn" : 'Waiting…';
     }
-    final toWin = room.numTeams == 2 ? 2 : 1;
+    final toWin = room.sequencesToWin;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
@@ -298,7 +378,8 @@ class _StatusBar extends StatelessWidget {
           const SizedBox(width: 10),
           Text(label, style: archivo(weight: FontWeight.w800, color: kInk, size: 16)),
           const Spacer(),
-          Text('$toWin TO WIN', style: eyebrow(color: kMuted)),
+          Text(showCode ? '${room.code} · $toWin TO WIN' : '$toWin TO WIN',
+              style: eyebrow(color: kMuted)),
         ],
       ),
     );

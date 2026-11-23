@@ -37,7 +37,12 @@ class CardCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return MouseRegion(
+      // On desktop, a hand cursor marks the legal targets for the chosen card.
+      cursor: highlighted && onTap != null
+          ? SystemMouseCursors.click
+          : MouseCursor.defer,
+      child: GestureDetector(
       onTap: onTap,
       child: Container(
         width: size,
@@ -74,6 +79,7 @@ class CardCell extends StatelessWidget {
             if (isWinning) _PulseRing(color: teamColor(team ?? 0), size: size, win: true),
           ],
         ),
+      ),
       ),
     );
   }

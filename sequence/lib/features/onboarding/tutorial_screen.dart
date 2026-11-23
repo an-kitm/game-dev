@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/theme.dart';
 import 'tutorial_provider.dart';
@@ -65,10 +64,10 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
 
   bool get _isLast => _page == _slides.length - 1;
 
-  Future<void> _finish() async {
-    await ref.read(tutorialSeenProvider.notifier).markSeen();
-    if (mounted) context.go('/home');
-  }
+  /// Marking the tutorial seen re-runs the router's redirect, which moves on
+  /// to Home — or to the invite link the player arrived on.
+  Future<void> _finish() =>
+      ref.read(tutorialSeenProvider.notifier).markSeen();
 
   void _next() {
     if (_isLast) {
@@ -84,42 +83,47 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
     return Scaffold(
       body: CanvasBackground(
         child: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
-                child: Row(
-                  children: [
-                    Text('HOW TO PLAY · ${_page + 1}/${_slides.length}',
-                        style: eyebrow()),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: _finish,
-                      child: const Text('Skip'),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
+                    child: Row(
+                      children: [
+                        Text('HOW TO PLAY · ${_page + 1}/${_slides.length}',
+                            style: eyebrow()),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: _finish,
+                          child: const Text('Skip'),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: PageView.builder(
-                  controller: _pager,
-                  itemCount: _slides.length,
-                  onPageChanged: (i) => setState(() => _page = i),
-                  itemBuilder: (context, i) => _SlideView(slide: _slides[i]),
-                ),
-              ),
-              _Dots(count: _slides.length, active: _page),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _next,
-                    child: Text(_isLast ? 'Get started' : 'Next'),
                   ),
-                ),
+                  Expanded(
+                    child: PageView.builder(
+                      controller: _pager,
+                      itemCount: _slides.length,
+                      onPageChanged: (i) => setState(() => _page = i),
+                      itemBuilder: (context, i) => _SlideView(slide: _slides[i]),
+                    ),
+                  ),
+                  _Dots(count: _slides.length, active: _page),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: _next,
+                        child: Text(_isLast ? 'Get started' : 'Next'),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

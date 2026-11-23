@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Generate the Sequence brand SVGs (app icon + store assets) from the design.
+"""Generate the Sequence brand SVGs (app icon + link-preview image) from the design.
 
 The mark is a diagonal "/" five-in-a-row of poker chips — blue, green, red
 (centre, larger), green, blue — on a dark radial-gradient field. Each chip
 carries the design-language detailing: a top-light/bottom-shade fill, a dashed
 white poker ring and a translucent centre hole, with a soft drop shadow.
 
-Run, then render to PNG with Inkscape (see tool/render_branding.sh).
+Run, render to PNG with Inkscape (tool/render_branding.sh), then build the
+web icons from the PNGs (tool/gen_web_icons.sh).
 """
 import math
 import os
@@ -107,20 +108,21 @@ def svg(w, h, inner):
             f'xmlns="http://www.w3.org/2000/svg">{defs()}{inner}</svg>')
 
 
-# 1) Master app icon — full bleed (iOS + Android legacy).
+# 1) Master app icon — full bleed (favicon, PWA and Apple touch icons).
 write("app_icon.svg", svg(1024, 1024,
       '<rect width="1024" height="1024" fill="url(#field)"/>'
       + mark(512, 512, 120, 132, 150, 30)))
 
-# 2) Adaptive foreground — mark only, transparent, padded to the safe zone.
+# 2) Foreground — mark only, transparent, padded to the safe zone. Layered
+#    over (3) to build the maskable PWA icons.
 write("app_icon_fg.svg", svg(1024, 1024,
       mark(512, 512, 78, 86, 98, 20, shadow=False)))
 
-# 3) Adaptive background — the dark field only.
+# 3) Background — the dark field only.
 write("app_icon_bg.svg", svg(1024, 1024,
       '<rect width="1024" height="1024" fill="url(#field)"/>'))
 
-# 4) Play Store feature graphic — 1024 x 500.
+# 4) Feature graphic — 1024 x 500, the og:image link preview.
 feature = (
     '<rect width="1024" height="500" fill="url(#field_fg)"/>'
     + mark(232, 250, 58, 64, 73, 16)

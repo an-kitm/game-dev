@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!--
+    Replaced at build time by `flutter build web --base-href /path/`. Leave as
+    is when the app is served from the root of a domain.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <!-- Flutter swaps in its own viewport tag at startup; `flt-viewport` marks
+       this one as expected so it does not log a warning. It is here so the
+       loading screen is laid out at device width on phones. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" flt-viewport>
+  <meta name="description" content="Play Sequence online with friends. Create a room, share the link, and race to five in a row.">
+  <meta name="theme-color" content="#F4F6FA">
+
+  <!-- Link previews when an invite link is pasted into a chat app. Some
+       scrapers need og:image to be an absolute URL — set it to
+       https://<your-domain>/og-image.png once the app is deployed. -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Sequence">
+  <meta property="og:description" content="Join my game of Sequence — five in a row wins.">
+  <meta property="og:image" content="og-image.png">
+
+  <!-- Installed-to-home-screen behaviour on iOS / Android -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Sequence">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="manifest" href="manifest.json">
+
+  <title>Sequence</title>
+
+  <style>
+    html, body { margin: 0; height: 100%; }
+    body {
+      background: radial-gradient(120% 120% at 50% 0%, #F4F6FA 0%, #E7EBF2 100%) fixed;
+    }
+    /* Shown while the app downloads; removed on Flutter's first frame. */
+    #splash {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 20px;
+      font: 700 13px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      letter-spacing: 0.3em; color: #8A93A3;
+      transition: opacity 200ms ease-out;
+    }
+    #splash img {
+      width: 88px; height: 88px; border-radius: 22px;
+      box-shadow: 0 16px 40px rgba(20, 24, 35, 0.18);
+      animation: splash-pulse 1.4s ease-in-out infinite alternate;
+    }
+    @keyframes splash-pulse { from { transform: scale(0.96); } to { transform: scale(1.04); } }
+    @media (prefers-reduced-motion: reduce) { #splash img { animation: none; } }
+  </style>
+</head>
+<body>
+  <div id="splash" aria-live="polite">
+    <img src="icons/Icon-192.png" alt="">
+    <span>LOADING SEQUENCE</span>
+  </div>
+  <noscript>Sequence needs JavaScript to run.</noscript>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var splash = document.getElementById('splash');
+      if (!splash) return;
+      splash.style.opacity = '0';
+      setTimeout(function () { splash.remove(); }, 250);
+    }, { once: true });
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

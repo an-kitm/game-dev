@@ -7,8 +7,6 @@ class Player {
   final String nickname;
   final int team;
   final int seatIndex;
-  final int handCount;
-  final bool connected;
   final DateTime? lastSeen;
 
   const Player({
@@ -18,8 +16,6 @@ class Player {
     required this.nickname,
     required this.team,
     required this.seatIndex,
-    required this.handCount,
-    required this.connected,
     required this.lastSeen,
   });
 
@@ -37,8 +33,6 @@ class Player {
         nickname: m['nickname'] as String,
         team: m['team'] as int,
         seatIndex: m['seat_index'] as int,
-        handCount: (m['hand_count'] as int?) ?? 0,
-        connected: (m['connected'] as bool?) ?? true,
         lastSeen: m['last_seen'] == null
             ? null
             : DateTime.tryParse(m['last_seen'] as String),

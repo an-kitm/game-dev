@@ -5,8 +5,9 @@ import '../../../rules/cards.dart';
 
 const Map<String, String> _suitGlyph = {'S': '♠', 'H': '♥', 'D': '♦', 'C': '♣'};
 
-/// The player's hand: a horizontal row of tappable cards. Jacks are tagged
-/// (two-eyed = WILD, one-eyed = REMOVE); unplayable cards are tagged DEAD.
+/// The player's hand: a horizontal row of tappable cards (or, with [wrap], rows
+/// that wrap to fit a narrow sidebar). Jacks are tagged (two-eyed = WILD,
+/// one-eyed = REMOVE); unplayable cards are tagged DEAD.
 class HandBar extends StatelessWidget {
   final List<String> cards;
   final String? selected;
@@ -14,6 +15,9 @@ class HandBar extends StatelessWidget {
   final bool enabled;
   final Color accent; // local player's team color (selection ring)
   final void Function(String card)? onCardTap;
+
+  /// Lay the cards out in wrapping rows instead of one scrolling strip.
+  final bool wrap;
 
   const HandBar({
     super.key,
@@ -23,10 +27,32 @@ class HandBar extends StatelessWidget {
     this.enabled = true,
     this.accent = kAccentDefault,
     this.onCardTap,
+    this.wrap = false,
   });
+
+  Widget _card(String code) => _HandCard(
+        code: code,
+        isSelected: code == selected,
+        isDead: deadCards.contains(code),
+        enabled: enabled,
+        accent: accent,
+        onTap: (enabled && onCardTap != null) ? () => onCardTap!(code) : null,
+      );
 
   @override
   Widget build(BuildContext context) {
+    if (wrap) {
+      // Run spacing leaves room for a selected card's upward lift.
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 30, 16, 8),
+        child: Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 10,
+          runSpacing: 30,
+          children: [for (final code in cards) _card(code)],
+        ),
+      );
+    }
     return SizedBox(
       height: 152,
       child: ListView.separated(
@@ -34,17 +60,7 @@ class HandBar extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
         itemCount: cards.length,
         separatorBuilder: (_, _) => const SizedBox(width: 10),
-        itemBuilder: (context, i) {
-          final code = cards[i];
-          return _HandCard(
-            code: code,
-            isSelected: code == selected,
-            isDead: deadCards.contains(code),
-            enabled: enabled,
-            accent: accent,
-            onTap: (enabled && onCardTap != null) ? () => onCardTap!(code) : null,
-          );
-        },
+        itemBuilder: (context, i) => _card(cards[i]),
       ),
     );
   }
@@ -93,7 +109,9 @@ class _HandCard extends StatelessWidget {
 
     return Opacity(
       opacity: enabled ? (isDead ? 0.6 : 1) : 0.55,
-      child: GestureDetector(
+      child: MouseRegion(
+        cursor: onTap != null ? SystemMouseCursors.click : MouseCursor.defer,
+        child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
@@ -175,6 +193,7 @@ class _HandCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

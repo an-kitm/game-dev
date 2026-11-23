@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/presence.dart';
+import '../../core/router.dart' show inviteLink;
 import '../../core/supabase.dart';
 import '../../core/theme.dart';
 import '../../data/lobby_repository.dart';
@@ -107,7 +108,10 @@ class _LobbyBodyState extends ConsumerState<_LobbyBody> {
         players.where((p) => p.team == t).length,
     ];
 
-    return Column(
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Column(
       children: [
         const SizedBox(height: 18),
         Text('ROOM CODE', style: eyebrow()),
@@ -129,7 +133,17 @@ class _LobbyBodyState extends ConsumerState<_LobbyBody> {
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: inviteLink(room.code)));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('Invite link copied — send it to your friends')),
+            );
+          },
+          icon: const Icon(Icons.link, size: 18),
+          label: const Text('Copy invite link'),
+        ),
         Text('${players.length} player(s) • ${room.numTeams} teams',
             style: Theme.of(context).textTheme.bodyMedium),
         if (me != null && room.isLobby) ...[
@@ -219,6 +233,8 @@ class _LobbyBodyState extends ConsumerState<_LobbyBody> {
                   textAlign: TextAlign.center),
         ),
       ],
+        ),
+      ),
     );
   }
 }

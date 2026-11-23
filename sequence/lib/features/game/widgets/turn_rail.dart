@@ -21,7 +21,10 @@ class TurnSeat {
 /// the active player in view.
 class TurnRail extends StatefulWidget {
   final List<TurnSeat> seats;
-  const TurnRail({super.key, required this.seats});
+
+  /// Drop the "TURN ORDER" label and tighten padding, for short screens.
+  final bool compact;
+  const TurnRail({super.key, required this.seats, this.compact = false});
 
   @override
   State<TurnRail> createState() => _TurnRailState();
@@ -63,7 +66,7 @@ class _TurnRailState extends State<TurnRail> {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: EdgeInsets.symmetric(vertical: widget.compact ? 6 : 10),
       decoration: BoxDecoration(
         color: kSurface,
         borderRadius: BorderRadius.circular(kRadiusControl),
@@ -72,10 +75,11 @@ class _TurnRailState extends State<TurnRail> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-            child: Text('TURN ORDER', style: eyebrow()),
-          ),
+          if (!widget.compact)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+              child: Text('TURN ORDER', style: eyebrow()),
+            ),
           SizedBox(
             height: 62,
             child: ListView.separated(

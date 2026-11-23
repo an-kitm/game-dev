@@ -1,9 +1,10 @@
 # Sequence
 
-An online multiplayer game of Sequence. One player creates a room, shares the
-four-letter code, and everyone races to line up five chips in a row.
+An online multiplayer game of Sequence, played in the browser. One player
+creates a room and shares an invite link (or the four-letter code), and
+everyone races to line up five chips in a row.
 
-Flutter client, Supabase backend. The server is authoritative: clients never
+Flutter web client, Supabase backend. The server is authoritative: clients never
 write game tables directly — every move goes through a `SECURITY DEFINER` RPC
 that validates it, and each player's hand lives in a table only its owner can
 read, so opponents' cards never reach a client.
@@ -15,9 +16,10 @@ read, so opponents' cards never reach a client.
 | `lib/rules/` | Pure game logic — board layout, legal moves, sequence detection. Unit-tested, no I/O. |
 | `lib/data/` | Repositories wrapping the Supabase RPCs and realtime streams. |
 | `lib/features/` | Screens: onboarding, lobby, game board. |
-| `lib/core/` | Router, theme, env, Supabase client, presence heartbeat. |
+| `lib/core/` | Router (incl. invite links), theme, env, Supabase client, presence heartbeat. |
+| `web/` | `index.html` (loading screen, link-preview tags), PWA manifest, icons. |
 | `supabase/migrations/` | Schema, RLS, and the game RPCs, in apply order. |
-| `tool/` | Branding generator and the board-layout SQL generator. |
+| `tool/` | Branding and web-icon generators, board-layout SQL generator. |
 
 The sequence-detection rules exist twice — in `lib/rules/sequence_detector.dart`
 (unit-tested) and as a PL/pgSQL port in migration `0003`. The port has a `DO`
@@ -27,20 +29,25 @@ self-test that runs at apply time to keep the two honest.
 
 ```sh
 flutter pub get
-flutter run
+flutter run -d chrome          # hot reload in Chrome
+flutter run -d web-server      # or serve a URL to open in any browser / phone on your LAN
 ```
 
 Point the app at a Supabase project either by editing the defaults in
 `lib/core/env.dart` or, better, at build time:
 
 ```sh
-flutter run \
+flutter run -d chrome \
   --dart-define=SUPABASE_URL=https://<ref>.supabase.co \
   --dart-define=SUPABASE_ANON_KEY=<anon key>
 ```
 
 The anon key is public by design — it is gated server-side by Row Level
 Security. The `service_role` key must never appear in the app.
+
+**Testing with several players on one machine:** every tab in the same browser
+profile shares one anonymous session, so two tabs are the *same* player. Use a
+private window or a second browser for each extra player.
 
 ## Setting up the backend
 
@@ -62,26 +69,37 @@ flutter test      # 33 tests: rules engine + widget smoke tests
 flutter analyze
 ```
 
-## Building a release
-
-Release signing reads `android/key.properties`, which is **not** in version
-control. It points at a keystore outside the repo:
-
-```properties
-storePassword=...
-keyPassword=...
-keyAlias=sequence
-storeFile=/Users/you/keystores/sequence-release.jks
-```
-
-Losing that keystore means you can never ship an update that upgrades an
-existing install — back it up somewhere durable.
+## Building and deploying
 
 ```sh
-flutter build apk --release       # single universal APK, easiest to share
-flutter build apk --release --split-per-abi   # smaller, one per architecture
-flutter build appbundle --release # for Google Play
+flutter build web --release      # output: build/web/
 ```
 
-Without `key.properties` the release build falls back to the debug key so the
-project still builds; that APK is fine for local testing and nothing else.
+`build/web/` is a static site — upload it to any static host (Netlify,
+Vercel, Cloudflare Pages, Firebase Hosting, GitHub Pages, an S3 bucket…).
+Routes use hash URLs (`https://host/#/join/ABCD`), so no server rewrite rules
+are needed. Serve it over HTTPS: copying the invite link uses the browser
+clipboard API, which only works in a secure context.
+
+- **Serving from a sub-path** (e.g. GitHub Pages at `user.github.io/sequence/`):
+  `flutter build web --release --base-href /sequence/`
+- **Caching:** Flutter's output files keep the same names between deploys
+  (`main.dart.js` has no content hash), so have the host revalidate them
+  (`Cache-Control: no-cache`) rather than cache them long-term — otherwise
+  players can keep running an old build after you deploy.
+- **Link previews:** some chat apps need `og:image` in `web/index.html` to be
+  an absolute URL — set it to `https://<your-domain>/og-image.png` once you
+  have a domain.
+
+Supabase needs no extra configuration for the web: players sign in
+anonymously, so there are no auth redirect URLs to allow-list.
+
+## Icons
+
+`web/favicon.png`, `web/icons/*` and `web/og-image.png` are generated from the
+brand art in `assets/branding/`:
+
+```sh
+python3 tool/gen_branding.py && tool/render_branding.sh   # only if the art changed
+tool/gen_web_icons.sh                                      # needs ImageMagick
+```
