@@ -117,12 +117,8 @@ class _LobbyBodyState extends ConsumerState<_LobbyBody> {
         Text('ROOM CODE', style: eyebrow()),
         const SizedBox(height: 6),
         InkWell(
-          onTap: () {
-            Clipboard.setData(ClipboardData(text: room.code));
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Code copied')),
-            );
-          },
+          onTap: () => _copy(context, room.code,
+              copied: 'Code copied', title: 'Room code'),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -134,13 +130,9 @@ class _LobbyBodyState extends ConsumerState<_LobbyBody> {
           ),
         ),
         TextButton.icon(
-          onPressed: () {
-            Clipboard.setData(ClipboardData(text: inviteLink(room.code)));
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('Invite link copied — send it to your friends')),
-            );
-          },
+          onPressed: () => _copy(context, inviteLink(room.code),
+              copied: 'Invite link copied — send it to your friends',
+              title: 'Invite link'),
           icon: const Icon(Icons.link, size: 18),
           label: const Text('Copy invite link'),
         ),
@@ -265,6 +257,40 @@ class _TeamPicker extends StatelessWidget {
       selected: {selected},
       showSelectedIcon: false,
       onSelectionChanged: (s) => onSelect(s.first),
+    );
+  }
+}
+
+/// Copies [text] to the clipboard and confirms with [copied]. Browsers only
+/// expose the clipboard on HTTPS or localhost, so when the app is served over
+/// plain HTTP (e.g. http://192.168.x.x on a home network) the copy fails —
+/// show the text in a dialog instead so it can be selected and copied by hand.
+Future<void> _copy(
+  BuildContext context,
+  String text, {
+  required String copied,
+  required String title,
+}) async {
+  try {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(copied)));
+    }
+  } catch (_) {
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: SelectableText(text),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
     );
   }
 }
