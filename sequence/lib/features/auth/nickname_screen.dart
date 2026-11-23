@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/router.dart' show finishOnboarding;
 import '../../core/theme.dart';
 import 'nickname_provider.dart';
 
@@ -28,7 +29,9 @@ class _NicknameScreenState extends ConsumerState<NicknameScreen> {
     if (name.isEmpty) return;
     setState(() => _saving = true);
     await ref.read(nicknameProvider.notifier).set(name);
-    // go_router redirect will move us to /home automatically.
+    // On to the tutorial (the redirect slots it in) and then wherever the
+    // player was headed, replacing this screen in the browser history.
+    if (mounted) finishOnboarding(context);
   }
 
   @override

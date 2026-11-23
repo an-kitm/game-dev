@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/router.dart' show enterRoom;
 import '../../core/theme.dart';
 import '../../data/lobby_repository.dart';
 import '../auth/nickname_provider.dart';
@@ -21,7 +22,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() => _busy = true);
     try {
       final roomId = await action();
-      if (mounted) context.go('/lobby/$roomId');
+      if (mounted) enterRoom(GoRouter.of(context), roomId);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

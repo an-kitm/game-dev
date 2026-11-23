@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/presence.dart';
-import '../../core/router.dart' show inviteLink;
+import '../../core/router.dart';
 import '../../core/supabase.dart';
 import '../../core/theme.dart';
 import '../../data/lobby_repository.dart';
@@ -21,11 +20,20 @@ class LobbyScreen extends ConsumerWidget {
     final roomAsync = ref.watch(roomStreamProvider(roomId));
     final playersAsync = ref.watch(playersStreamProvider(roomId));
 
-    // When the host starts the game, everyone navigates to the board.
+    // When the host starts the game, everyone moves on to the board — in
+    // place, so Back from the game can't return to this finished lobby.
     ref.listen(roomStreamProvider(roomId), (_, next) {
+      if (next.error is RoomUnavailable) return leaveUnavailableRoom(context);
       final room = next.value;
-      if (room != null && room.isPlaying) {
-        context.go('/game/$roomId');
+      if (room != null && !room.isLobby) {
+        replaceRoute(context, '/game/$roomId');
+      }
+    });
+    // Reached a lobby this player isn't in (e.g. Forward after leaving it).
+    ref.listen(playersStreamProvider(roomId), (_, next) {
+      final players = next.value;
+      if (players != null && !players.any((p) => p.userId == currentUserId)) {
+        leaveUnavailableRoom(context);
       }
     });
 
@@ -36,21 +44,52 @@ class LobbyScreen extends ConsumerWidget {
         title: const Text('Lobby'),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () async {
-            await ref.read(lobbyRepositoryProvider).leaveRoom(roomId);
-            if (context.mounted) context.go('/home');
-          },
+          tooltip: 'Leave room',
+          // Same as the browser's Back: the route's onExit leaves the room.
+          onPressed: () => exitRoomToHome(context),
         ),
       ),
+      // Keep showing the lobby through a realtime hiccup or reconnect; the
+      // listeners above handle a room that is really gone.
       body: roomAsync.when(
+        skipError: true,
+        skipLoadingOnReload: true,
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Room closed: $e')),
+        error: (e, _) => _Unavailable(message: '$e'),
         data: (room) => playersAsync.when(
+          skipError: true,
+          skipLoadingOnReload: true,
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('$e')),
+          error: (e, _) => _Unavailable(message: '$e'),
           data: (players) => _LobbyBody(room: room, players: players),
         ),
       ),
+      ),
+    );
+  }
+}
+
+/// Fallback when the lobby can't be loaded at all.
+class _Unavailable extends StatelessWidget {
+  final String message;
+  const _Unavailable({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: () => replaceRoute(context, '/home'),
+              child: const Text('Go to Home'),
+            ),
+          ],
+        ),
       ),
     );
   }

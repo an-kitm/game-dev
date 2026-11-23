@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/router.dart' show enterRoom, replaceRoute;
 import '../../core/theme.dart';
 import '../../data/lobby_repository.dart';
 import '../auth/nickname_provider.dart';
@@ -36,7 +37,14 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
             code: _code,
             nickname: ref.read(nicknameProvider) ?? '',
           );
-      if (mounted) context.go('/lobby/$roomId');
+      if (!mounted) return;
+      // Swap this invite-link entry for Home, then enter the room from there:
+      // Back from the lobby then returns Home (leaving the room) instead of
+      // reopening the link, which would join all over again.
+      final router = GoRouter.of(context);
+      replaceRoute(context, '/home');
+      await WidgetsBinding.instance.endOfFrame;
+      enterRoom(router, roomId);
     } catch (e) {
       if (mounted) setState(() => _error = friendlyLobbyError(e));
     }
@@ -72,7 +80,7 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
                     ),
                     const SizedBox(height: 14),
                     OutlinedButton(
-                      onPressed: () => context.go('/home'),
+                      onPressed: () => replaceRoute(context, '/home'),
                       child: const Text('Go to Home'),
                     ),
                   ],

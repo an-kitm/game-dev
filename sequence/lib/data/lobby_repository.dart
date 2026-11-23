@@ -7,6 +7,15 @@ import '../core/supabase.dart';
 import '../models/player.dart';
 import '../models/room.dart';
 
+/// The room no longer exists, or this player can no longer see it (Row Level
+/// Security shows a room only to its members). Distinct from a transient
+/// realtime error, which shouldn't send anyone back to Home.
+class RoomUnavailable implements Exception {
+  const RoomUnavailable();
+  @override
+  String toString() => 'This room is no longer available.';
+}
+
 /// Thin wrapper over the lobby RPCs and realtime streams.
 class LobbyRepository {
   final SupabaseClient _client;
@@ -47,13 +56,14 @@ class LobbyRepository {
     await _client.rpc('set_team', params: {'p_room': roomId, 'p_team': team});
   }
 
-  /// Live room state (board, turn, status). Errors if the room disappears.
+  /// Live room state (board, turn, status). Errors with [RoomUnavailable] if
+  /// the room disappears or the player is no longer in it.
   Stream<Room> roomStream(String roomId) => _client
       .from('rooms')
       .stream(primaryKey: ['id'])
       .eq('id', roomId)
       .map((rows) {
-        if (rows.isEmpty) throw StateError('room closed');
+        if (rows.isEmpty) throw const RoomUnavailable();
         return Room.fromMap(rows.first);
       });
 

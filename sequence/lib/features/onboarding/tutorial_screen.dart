@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/router.dart' show finishOnboarding;
 import '../../core/theme.dart';
 import 'tutorial_provider.dart';
 
@@ -64,10 +65,12 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
 
   bool get _isLast => _page == _slides.length - 1;
 
-  /// Marking the tutorial seen re-runs the router's redirect, which moves on
-  /// to Home — or to the invite link the player arrived on.
-  Future<void> _finish() =>
-      ref.read(tutorialSeenProvider.notifier).markSeen();
+  /// On to Home — or the invite link the player arrived on — replacing the
+  /// tutorial in the browser history so Back can't return to it.
+  Future<void> _finish() async {
+    await ref.read(tutorialSeenProvider.notifier).markSeen();
+    if (mounted) finishOnboarding(context);
+  }
 
   void _next() {
     if (_isLast) {

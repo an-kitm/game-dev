@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/presence.dart';
+import '../../core/router.dart';
 import '../../core/supabase.dart';
 import '../../core/theme.dart';
 import '../../data/game_repository.dart';
@@ -121,10 +121,19 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     final handAsync = ref.watch(handStreamProvider(widget.roomId));
     final lastMove = ref.watch(lastMoveProvider(widget.roomId)).value;
 
-    // A rematch resets the room to the lobby; send everyone back there.
+    // A rematch resets the room to the lobby; send everyone back there — in
+    // place, so Back from the lobby can't return to the finished match.
     ref.listen(roomStreamProvider(widget.roomId), (_, next) {
+      if (next.error is RoomUnavailable) return leaveUnavailableRoom(context);
       final r = next.value;
-      if (r != null && r.isLobby) context.go('/lobby/${widget.roomId}');
+      if (r != null && r.isLobby) replaceRoute(context, '/lobby/${widget.roomId}');
+    });
+    // Reached a game this player isn't in (e.g. Forward after leaving it).
+    ref.listen(playersStreamProvider(widget.roomId), (_, next) {
+      final players = next.value;
+      if (players != null && !players.any((p) => p.userId == currentUserId)) {
+        leaveUnavailableRoom(context);
+      }
     });
 
     final room = roomAsync.value;
@@ -132,6 +141,17 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     final hand = handAsync.value ?? const <String>[];
 
     if (room == null || players == null) {
+      // Can't load at all (the listener above usually sends them Home first).
+      if (roomAsync.hasError && !roomAsync.hasValue) {
+        return Scaffold(
+          body: Center(
+            child: OutlinedButton(
+              onPressed: () => replaceRoute(context, '/home'),
+              child: const Text('Go to Home'),
+            ),
+          ),
+        );
+      }
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
@@ -429,10 +449,9 @@ class _WinnerBanner extends ConsumerWidget {
               ),
               const SizedBox(width: 12),
               OutlinedButton(
-                onPressed: () async {
-                  await ref.read(lobbyRepositoryProvider).leaveRoom(room.id);
-                  if (context.mounted) context.go('/home');
-                },
+                // Same as the browser's Back here: the route's onExit leaves
+                // the finished room.
+                onPressed: () => exitRoomToHome(context),
                 child: const Text('Home'),
               ),
             ],
