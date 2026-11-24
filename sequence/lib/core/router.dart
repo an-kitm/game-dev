@@ -60,12 +60,31 @@ void replaceRoute(BuildContext context, String location) =>
 void enterRoom(GoRouter router, String roomId) =>
     _inApp(() => router.go('/lobby/$roomId'));
 
-/// Goes back to Home from a room screen — the lobby's ✕ and the results' Home
-/// button. Steps the browser back when the entry below is the app (Home), so
-/// no entry is left pointing at the room; otherwise replaces. Leaving the room
+/// Set while a room screen is on its way back to Home. Stepping the browser
+/// back completes asynchronously, and several triggers can fire before it
+/// lands — e.g. a deleted room trips both the room and the player-list
+/// checks — each of which would step back again and overshoot, past Home and
+/// out of the site. Cleared when the room screen is actually left (its
+/// onExit), or after a moment in case the browser never moves.
+var _exitingRoom = false;
+Timer? _exitingRoomReset;
+
+void _roomExited() {
+  _exitingRoom = false;
+  _exitingRoomReset?.cancel();
+}
+
+/// Goes back to Home from a room screen — the lobby's ✕, the results' Home
+/// button, a room that's gone. Steps the browser back when the entry below is
+/// the app (Home), so no entry is left pointing at the room; otherwise
+/// replaces. Repeat calls while one is under way are ignored. Leaving the room
 /// itself happens in the route's onExit, which also covers the browser's own
 /// Back button.
 void exitRoomToHome(BuildContext context) {
+  if (_exitingRoom) return;
+  _exitingRoom = true;
+  _exitingRoomReset?.cancel();
+  _exitingRoomReset = Timer(const Duration(seconds: 2), _roomExited);
   if (hasAppEntryBelow() && browserBack()) return;
   replaceRoute(context, '/home');
 }
@@ -203,6 +222,7 @@ bool _backClosedPopup(BuildContext context) {
 /// takes the player out of the room. Only moving on to the game keeps them in.
 bool _exitLobby(BuildContext context, String roomId) {
   if (_backClosedPopup(context)) return false;
+  _roomExited();
   final container = ProviderScope.containerOf(context, listen: false);
   final room = container.read(roomStreamProvider(roomId));
   final repo = container.read(lobbyRepositoryProvider);
@@ -231,7 +251,10 @@ bool _exitGame(BuildContext context, String roomId) {
   if (_backClosedPopup(context)) return false;
   final container = ProviderScope.containerOf(context, listen: false);
   final room = container.read(roomStreamProvider(roomId)).value;
-  if (room == null) return true; // gone, or not ours to see
+  if (room == null) {
+    _roomExited();
+    return true; // gone, or not ours to see
+  }
   if (room.isPlaying && !_navigatingInApp) {
     // The browser has already moved its URL back; step forward again so the
     // address bar matches the game that is still on screen.
@@ -247,6 +270,7 @@ bool _exitGame(BuildContext context, String roomId) {
     unawaited(
         _quietly(container.read(lobbyRepositoryProvider).leaveRoom(roomId)));
   }
+  _roomExited();
   return true;
 }
 
