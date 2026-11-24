@@ -1,0 +1,64 @@
+# Builds the Sequence web app (sequence/) and publishes it to GitHub Pages on
+# every push to main that touches it. Live at https://an-kitm.github.io/game-dev/
+#
+# No secrets needed: the app only uses the Supabase URL and anon key from
+# sequence/lib/core/env.dart, which are public by design (Row Level Security
+# guards the data).
+name: Deploy web app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sequence/**'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; a newer push queues behind one already publishing.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sequence
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.4' # same as local development
+          cache: true
+
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+      # Pages serves the site under /<repo-name>/, so asset URLs need that as
+      # their base path. Routes are hash URLs (/#/join/ABCD): no 404 fallback
+      # or rewrites needed.
+      - run: flutter build web --release --base-href /${{ github.event.repository.name }}/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: sequence/build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -4,6 +4,8 @@ An online multiplayer game of Sequence, played in the browser. One player
 creates a room and shares an invite link (or the four-letter code), and
 everyone races to line up five chips in a row.
 
+**Play it: https://an-kitm.github.io/game-dev/**
+
 Flutter web client, Supabase backend. The server is authoritative: clients never
 write game tables directly — every move goes through a `SECURITY DEFINER` RPC
 that validates it, and each player's hand lives in a table only its owner can
@@ -71,6 +73,14 @@ flutter analyze
 
 ## Building and deploying
 
+**Live deployment:** every push to `main` that touches `sequence/` runs
+[`.github/workflows/deploy-web.yml`](../.github/workflows/deploy-web.yml),
+which analyzes, tests, builds and publishes to GitHub Pages at
+https://an-kitm.github.io/game-dev/. No secrets are involved. To redeploy by
+hand: Actions → *Deploy web app* → *Run workflow*.
+
+To build locally:
+
 ```sh
 flutter build web --release      # output: build/web/
 ```
@@ -87,9 +97,9 @@ clipboard API, which only works in a secure context.
   (`main.dart.js` has no content hash), so have the host revalidate them
   (`Cache-Control: no-cache`) rather than cache them long-term — otherwise
   players can keep running an old build after you deploy.
-- **Link previews:** some chat apps need `og:image` in `web/index.html` to be
-  an absolute URL — set it to `https://<your-domain>/og-image.png` once you
-  have a domain.
+- **Link previews:** chat apps need `og:image` in `web/index.html` as an
+  absolute URL; it points at the GitHub Pages deployment — update it if the
+  app moves to another domain.
 
 Supabase needs no extra configuration for the web: players sign in
 anonymously, so there are no auth redirect URLs to allow-list.
